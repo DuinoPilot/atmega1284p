@@ -34,7 +34,7 @@ char rampTable[256] ;
 // Time variables
 // the volitile is needed because the time is only set in the ISR
 // time counts mSec, sample counts DDS samples (62.5 KHz)
-volatile unsigned int time, sample, rampCount;
+volatile unsigned int time, sample, rampCount, chirp_time, syl_time, syl_dur;
 volatile char count, scount;
 
 // index for sine table build
@@ -63,6 +63,9 @@ begin
     // all time updates should go here
 		count=countMS;
 		time++;    //in mSec
+    chirp_time++;
+    syl_time++;
+    syl_dur++;
 	end  
 
   // if playing set ocr0a to dds, else set to 128
@@ -85,6 +88,9 @@ begin
 
   // init the time counter
   time=0;
+  chirp_time = 0;
+  syl_timer  = 0;
+  syl_dur    = 0;
   scount=0;
 
   // timer 0 runs at full rate
@@ -104,10 +110,10 @@ begin
   while(1) 
   begin  
    
-    if(ctime==chirp_repeat_interval)
+    if(chirp_time==chirp_repeat_interval)
     begin
       ctime=0;
-      if (time==syllable_repeat_interval) 
+      if (syl_time==syllable_repeat_interval) 
       begin
   	    // start a new syllable cycle 
         time=0;
@@ -130,8 +136,8 @@ begin
       end //if (time==50)
 
       // after syllable duration (ms) turn off PWM -- don't do this!
-      if (time==syllable_duration || scount==syllable_count) OCR0A = 128 ;
+      if (syl_dur==syllable_duration || scount==syllable_count) OCR0A = 128 ;
     end
-   end // end while(1)
+  end // end while(1)
 end  //end main
       
