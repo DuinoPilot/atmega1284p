@@ -141,36 +141,35 @@ begin
   while(1) 
   begin  
    
-    if(chirpTimer == 0)
+    if(chirpRepeatTimer == 0)
     begin
 
       // reset chirp timer and syllable count
-      chirpTimer    = chirpRepeatInterval;
-      syllableCount = numberOfSyllables;
+      chirpRepeatTimer = chirpRepeatInterval;
+      syllableCount    = numberOfSyllables;
 
     end
 
     if (syllableRepeatTimer == 0 && syllableCount > 0) 
-      begin
-        // start a new syllable cycle 
-        syllableRepeatTimer = syllableRepeatInterval;
-        syllableCount--;
+    begin
+      // start a new syllable cycle 
+      syllableRepeatTimer = syllableRepeatInterval;
+      syllableCount--;
 
-        // init ramp variables
-        sample    = 0;
-        rampCount = 0;
+      // init ramp variables
+      sample    = 0;
+      rampCount = 0;
 
-        // init the DDS phase increment
-        // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
-        // increment = 2^32*256*Fout/16e6 = 68719 * Fout
-        // Fout=1000 Hz, increment= 68719000 
-        increment = 68719 * burstFrequency; 
+      // init the DDS phase increment
+      // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
+      // increment = 2^32*256*Fout/16e6 = 68719 * Fout
+      // Fout=1000 Hz, increment= 68719000 
+      increment = 68719 * burstFrequency; 
 
-        // phase lock the sine generator DDS
-        accumulator = 0 ;
+      // phase lock the sine generator DDS
+      accumulator = 0 ;
 
-        TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
-    
+      TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
     end
 
   end // end while(1)
