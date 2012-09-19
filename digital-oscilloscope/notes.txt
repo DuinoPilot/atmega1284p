@@ -1,0 +1,9 @@
+unfold for loop in interrupt
+
+else statement for interrupt
+  wait(x)
+  sample ADC
+  check trigger
+  wait 32 usec
+  sample ADC
+  check trigger
