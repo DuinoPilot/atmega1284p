@@ -83,7 +83,7 @@ begin
     }
 
   	// 62 counts is about 1 mSec
-  	if( count-- == 0 )
+  	if( --count == 0 )
   	begin
   		count = countMS;
       chirpRepeatTimer--;
@@ -99,7 +99,7 @@ begin
 
 end 
  
-void initDDS()
+void initDDS(void)
 begin
 
   // make B.3 a pwm output

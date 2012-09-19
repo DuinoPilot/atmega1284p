@@ -13,8 +13,8 @@
 #include "lcd_lib.h"
 
 //timeout values for each task
-#define stateDelay 30  // delta t
-#define t1 200
+#define stateUpdateTime 30  // delta t
+#define LCDUpdateTime 200
  
 //I like these 
 #define begin {
@@ -25,6 +25,7 @@
 
 // the decoded button number
 unsigned char  butnum;
+unsigned char  ready;
 unsigned char  playing;
 
 //key pad scan table
@@ -72,13 +73,11 @@ unsigned char PushState;	//state machine
 ISR (TIMER0_COMPA_vect) 
 begin
   //Decrement the three times if they are not already zero
-  if (~playing && stateTimer>0) --stateTimer;
-  if (LCDTimer > 0)
+  if (~playing && stateTimer > 0) --stateTimer;
+
+  if( --LCDTimer == 0 )
   begin
-  	--LCDTimer;
-  end
-  else if(LCDTimer == 0)
-  begin
+    LCDTimer = LCDUpdateTime;
   	update_lcd();
   end
 
@@ -89,22 +88,23 @@ end
 //
 
 void update_lcd(void)
-{
+begin
+
  	LCDstring(lcd_buffer, strlen(lcd_buffer));
-}
+
+end
 
 /**********************/
 void get_param(void)
 begin
 	
-    // reset key array and butnumber
+  // reset key array and butnumber
 	memset(&keystr, 0, maxparam);
 	keyCounter = 0;
 	while (keyCounter < maxparam)
 	begin;
 		keystr[keyCounter++] = get_key();
 	end
-	
 
 end
 
@@ -117,42 +117,43 @@ begin
 		switch (i)
 		begin
 			case 0:
-			//	CopyStringtoLCD(cri, 0, 0);
+        // getting chirpRepeatInterval
+			  //	CopyStringtoLCD(cri, 0, 0);
 				get_param();
 				memset( &param_array[i][maxparam], 0, maxparam);
 				memcpy( &param_array[i][maxparam], &keystr, maxparam);
 				break;
-				
 			case 1:
+        // getting numberOfSyllables
 				CopyStringtoLCD(cri, 0, 0);
 				get_param();
 				memset( &param_array[i][maxparam], 0, maxparam);
 				memcpy( &param_array[i][maxparam], &keystr, maxparam);
 				break;
-				
 			case 2:
-			//	CopyStringtoLCD(cri, 0, 0);
+        // getting syllableDuration
+			  //	CopyStringtoLCD(cri, 0, 0);
 				get_param();
 				memset( &param_array[i][maxparam], 0, maxparam);
 				memcpy( &param_array[i][maxparam], &keystr, maxparam);
 				break;
-				
 			case 3:
-			//	CopyStringtoLCD(cri, 0, 0);
+        // getting syllableRepeatInterval
+			  //	CopyStringtoLCD(cri, 0, 0);
 				get_param();
 				memset( &param_array[i][maxparam], 0, maxparam);
 				memcpy( &param_array[i][maxparam], &keystr, maxparam);
 				break;
-			
 			case 4:
-			//	CopyStringtoLCD(cri, 0, 0);
+        // getting burstFrequency
+			  //	CopyStringtoLCD(cri, 0, 0);
 				get_param();
 				memset( &param_array[i][maxparam], 0, maxparam);
 				memcpy( &param_array[i][maxparam], &keystr, maxparam);
 				break;
 		end
-		
 	end
+
 end
 
 unsigned char get_key(void)
@@ -162,31 +163,32 @@ begin
 	
   // reset butnumber
 	butnum = 0;
-	
-	while (~playing) // inf loop??
+	ready = 0;
+  
+	while (~ready) // inf loop??
 	begin
 		scan_keypad();
 
 		//if(time3 == 0)
 		//begin
 		
-			temp = check_state();
-			if(temp != 0 && temp != term)
-			begin
-				output = temp;
-			end
+		temp = check_state();
+		if(temp != 0 && temp != term)
+		begin
+			output = temp;
+		end
 			
 		//end
 	end
 	
   // reset state machine
-	stateTimer = stateDelay;
+	stateTimer = stateUpdateTime;
 
 	return output;
 end
 
 /*********************/
-void scan_keypad()
+void scan_keypad(void)
 begin
 
   unsigned char key;
@@ -218,11 +220,11 @@ end
 
 
 //Task 3  
-unsigned char check_state()
+unsigned char check_state(void)
 begin
 	unsigned char output = 0;
 	unsigned char test[2];
-  stateTimer = stateDelay;     //reset the task timer
+  stateTimer = stateUpdateTime;     //reset the task timer
   unsigned char maybe = butnum;
 	
   switch (PushState)
@@ -262,7 +264,7 @@ begin
       break;
     case Done:
 	    sprintf(keystr,"\0");
-      playing = 1;
+      ready = 1;
       break;
   end
 	
@@ -274,18 +276,24 @@ end
 void initKeyPad(void)
 begin
 
-  keyCounter = 0;
-  playing = 0;
+  //set up timer 0 for 1 mSec timebase 
+  OCR0A = 249;     //set the compare re to 250 time ticks
+  TIMSK0= (1<<OCIE0A); //turn on timer 0 cmp match ISR 
+  //set prescalar to divide by 64 
+  TCCR0B= 3; //0b00000011; 
+  // turn on clear-on-match
+  TCCR0A= (1<<WGM01) ;
 
   //init the task timers
-  stateTimer = stateDelay;
-  LCDTimer   = t1;  
+  stateTimer = stateUpdateTime;
+  LCDTimer   = LCDUpdateTime;  
   
   // initialize LCD
   LCDinit();
   LCDcursorOFF();
   LCDclr();
   LCDGotoXY(0,0);
+
   //init the state machine
   PushState = Released;
       
@@ -298,12 +306,8 @@ end
 //Entry point and task scheduler loop
 int main(void)
 begin  
-  unsigned char start = 1;
-  unsigned char stop  = 2;
-  unsigned char value;
 
-  unsigned char startup = 1;
-
+  playing = 0;
   initKeyPad();
   
   while(1)
@@ -311,10 +315,11 @@ begin
 
     if( playing ){
 
-      
+      // do DDS stuff
 
     } else {
 
+      // scan keypad
       get_call();
 
     }
