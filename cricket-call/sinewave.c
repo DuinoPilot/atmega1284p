@@ -12,12 +12,13 @@
 #define begin {
 #define end   } 
 
-#define countMS 62  //ticks/mSec
+#define countMS 63  //ticks/mSec
 
 #define chirpRepeatInterval 250
-#define syllableRepeatInterval 30
+#define syllableRepeatInterval 50
 #define syllableDuration 18
-#define syllableCount 4
+#define numberOfSyllables 4
+#define burstFrequency 5000
 // ramp constants
 #define RAMPUPEND 250 // = 4*62.5 or 4mSec * 62.5 samples/mSec NOTE:max=255
 #define RAMPDOWNSTART 625 // = 10*62.5
@@ -39,17 +40,17 @@ volatile unsigned int sample, rampCount;
 volatile char count;
 
 // Timers / Counters
-//volatile uint16_t chirpRepeatTimer;      // measures time between chirps
-//volatile uint8_t  syllableDurationTimer; // measures time for one syllable
-//volatile uint8_t  syllableRepeatTimer;   // measures time between syllables
-//volatile uint8_t  syllableCount;         // counts the number of syllables
+volatile uint16_t chirpRepeatTimer;      // measures time between chirps
+volatile uint8_t  syllableDurationTimer; // measures time for one syllable
+volatile uint8_t  syllableRepeatTimer;   // measures time between syllables
+volatile uint8_t  syllableCount;         // counts the number of syllables
 
 // Parameters
-uint16_t chirpRepeatInterval;
-uint8_t  numberOfSyllables;
-uint8_t  syllableDuration;
-uint8_t  syllableRepeatInterval;
-uint16_t burstFrequency;   // frequency of the cricket call
+//uint16_t chirpRepeatInterval;
+//uint8_t  numberOfSyllables;
+//uint8_t  syllableDuration;
+//uint8_t  syllableRepeatInterval;
+//uint16_t burstFrequency;   // frequency of the cricket call
 
 // State Variables
 char playing;
@@ -62,7 +63,7 @@ begin
 
   if( playing ){
 
-    if(syllableCount > 0 && syllableDurationTimer > 0){
+    if(syllableDurationTimer > 0){
 
     	accumulator = accumulator + increment ;
     	highbyte = (char)(accumulator >> 24) ;
@@ -76,7 +77,8 @@ begin
     	if (sample > RAMPDOWNEND) rampCount = 0; 
 
   	}else{
-
+	  
+	  // reset syllable duration timer
       syllableDurationTimer = syllableDuration;
       OCR0A = 128;
 
@@ -85,7 +87,7 @@ begin
   	// 62 counts is about 1 mSec
   	if( --count == 0 )
   	begin
-  		count = countMS;
+  	  count = countMS;
       chirpRepeatTimer--;
       syllableRepeatTimer--;
       syllableDurationTimer--;
@@ -99,7 +101,7 @@ begin
 
 end 
  
-void initDDS(void)
+void initDDS()
 begin
 
   // make B.3 a pwm output
@@ -137,6 +139,7 @@ int main(void)
 begin 
 
   initDDS();
+  playing = 1;
 
   while(1) 
   begin  
@@ -150,26 +153,29 @@ begin
 
     end
 
-    if (syllableRepeatTimer == 0 && syllableCount > 0) 
+    if (syllableRepeatTimer == 0) 
     begin
-      // start a new syllable cycle 
+      // reset syllable cycle 
       syllableRepeatTimer = syllableRepeatInterval;
       syllableCount--;
 
-      // init ramp variables
-      sample    = 0;
-      rampCount = 0;
+      if(syllableCount > 0)
+      begin
+        // init ramp variables
+        sample    = 0;
+        rampCount = 0;
 
-      // init the DDS phase increment
-      // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
-      // increment = 2^32*256*Fout/16e6 = 68719 * Fout
-      // Fout=1000 Hz, increment= 68719000 
-      increment = 68719 * burstFrequency; 
+        // init the DDS phase increment
+        // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
+        // increment = 2^32*256*Fout/16e6 = 68719 * Fout
+        // Fout=1000 Hz, increment= 68719000 
+        increment = 68719 * burstFrequency; 
 
-      // phase lock the sine generator DDS
-      accumulator = 0 ;
+        // phase lock the sine generator DDS
+        accumulator = 0 ;
 
-      TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
+        TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
+      end
     end
 
   end // end while(1)
