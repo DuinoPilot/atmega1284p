@@ -14,11 +14,12 @@
 
 #define countMS 63  //ticks/mSec
 
-#define chirpRepeatInterval 250
-#define syllableRepeatInterval 50
-#define syllableDuration 18
-#define numberOfSyllables 4
-#define burstFrequency 5000
+//#define chirpRepeatInterval 20
+//#define syllableRepeatInterval 10
+//#define syllableDuration 10
+//#define numberOfSyllables 1
+//#define burstFrequency 4500
+
 // ramp constants
 #define RAMPUPEND 250 // = 4*62.5 or 4mSec * 62.5 samples/mSec NOTE:max=255
 #define RAMPDOWNSTART 625 // = 10*62.5
@@ -46,11 +47,11 @@ volatile uint8_t  syllableRepeatTimer;   // measures time between syllables
 volatile uint8_t  syllableCount;         // counts the number of syllables
 
 // Parameters
-//uint16_t chirpRepeatInterval;
-//uint8_t  numberOfSyllables;
-//uint8_t  syllableDuration;
-//uint8_t  syllableRepeatInterval;
-//uint16_t burstFrequency;   // frequency of the cricket call
+uint16_t chirpRepeatInterval;
+uint8_t  numberOfSyllables;
+uint8_t  syllableDuration;
+uint8_t  syllableRepeatInterval;
+uint16_t burstFrequency;   // frequency of the cricket call
 
 // State Variables
 char playing;
@@ -62,7 +63,6 @@ ISR (TIMER0_OVF_vect)
 begin 
 
   if( playing ){
-
     if(syllableDurationTimer > 0){
 
     	accumulator = accumulator + increment ;
@@ -79,7 +79,7 @@ begin
   	}else{
 	  
 	  // reset syllable duration timer
-      syllableDurationTimer = syllableDuration;
+     // syllableDurationTimer = syllableDuration;
       OCR0A = 128;
 
     }
@@ -88,9 +88,9 @@ begin
   	if( --count == 0 )
   	begin
   	  count = countMS;
-      chirpRepeatTimer--;
-      syllableRepeatTimer--;
-      syllableDurationTimer--;
+      --chirpRepeatTimer;
+      --syllableRepeatTimer;
+      --syllableDurationTimer;
   	end  
 
   }else{
@@ -115,13 +115,13 @@ begin
   end  
 
   // init the timers & counter
-  count               = countMS;
-  chirpRepeatTimer    = chirpRepeatInterval;
-  syllableRepeatTimer = syllableRepeatInterval;
-  syllableCount       = numberOfSyllables;
-
-  TCCR0B = 1;          // timer 0 runs at full rate
-  TIMSK0 = (1<<TOIE0); // turn on timer 0 overflow ISR
+  count                 = countMS;
+  chirpRepeatTimer      = chirpRepeatInterval;
+  syllableRepeatTimer   = 0; // init to 0 to allow buffer interval
+  syllableCount         = 0;
+	syllableDurationTimer = 0;
+  TCCR0B                = 1; // timer 0 runs at full rate
+  TIMSK0                = (1<<TOIE0); // turn on timer 0 overflow ISR
 
   // turn on PWM
   // turn on fast PWM and OC0A output
@@ -140,29 +140,36 @@ begin
 
   initDDS();
   playing = 1;
+  
+  if( playing )
+  begin 
 
-  while(1) 
-  begin  
-   
-    if(chirpRepeatTimer == 0)
-    begin
-
-      // reset chirp timer and syllable count
-      cli();  // force atomic transaction by disabling interrupts
-      chirpRepeatTimer = chirpRepeatInterval;  // takes two cycles to set 16bit int
-      sei();  // renable interrupts
-      syllableCount    = numberOfSyllables;
-
-    end
-
-    if (syllableRepeatTimer == 0) 
-    begin
-      // reset syllable cycle 
-      syllableRepeatTimer = syllableRepeatInterval;
-      syllableCount--;
-
-      if(syllableCount > 0)
+    while(1) 
+    begin  
+   	
+      if(chirpRepeatTimer == 0)
       begin
+
+        // reset all timers and counters
+        cli();  // force atomic transaction by disabling interrupts
+        chirpRepeatTimer      = chirpRepeatInterval;  // takes two cycles to set 16bit int
+        syllableRepeatTimer   = syllableRepeatInterval;
+	      syllableDurationTimer = syllableDuration;
+  	    syllableCount         = numberOfSyllables;
+	      sei();  // renable interrupts
+      
+      end
+
+      if (syllableRepeatTimer == 0 && syllableCount > 0) 
+      begin
+
+        // reset syllable timers
+        syllableRepeatTimer   = syllableRepeatInterval;
+	      syllableDurationTimer = syllableDuration;
+
+        // update syllable counter
+        syllableCount--;
+      
         // init ramp variables
         sample    = 0;
         rampCount = 0;
@@ -174,12 +181,12 @@ begin
         increment = 68719 * burstFrequency; 
 
         // phase lock the sine generator DDS
-        accumulator = 0 ;
-
-        TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
+        accumulator = 0 ; 
+	  
       end
-    end
 
-  end // end while(1)
-end  //end main
-      
+    end // end while(1)
+
+  end // if(playing)
+
+end  //end main      
