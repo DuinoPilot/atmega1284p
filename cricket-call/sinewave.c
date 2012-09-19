@@ -148,7 +148,9 @@ begin
     begin
 
       // reset chirp timer and syllable count
-      chirpRepeatTimer = chirpRepeatInterval;
+      cli();  // force atomic transaction by disabling interrupts
+      chirpRepeatTimer = chirpRepeatInterval;  // takes two cycles to set 16bit int
+      sei();  // renable interrupts
       syllableCount    = numberOfSyllables;
 
     end
