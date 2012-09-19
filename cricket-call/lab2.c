@@ -95,7 +95,7 @@ begin
 end
 
 /**********************/
-void get_param(void)
+void get_param(int i)
 begin
 	
   // reset key array and butnumber
@@ -105,6 +105,9 @@ begin
 	begin;
 		keystr[keyCounter++] = get_key();
 	end
+
+  memset( &param_array[i][maxparam], 0, maxparam);
+  memcpy( &param_array[i][maxparam], &keystr, maxparam);
 
 end
 
@@ -119,37 +122,27 @@ begin
 			case 0:
         // getting chirpRepeatInterval
 			  //	CopyStringtoLCD(cri, 0, 0);
-				get_param();
-				memset( &param_array[i][maxparam], 0, maxparam);
-				memcpy( &param_array[i][maxparam], &keystr, maxparam);
+				get_param(i);
 				break;
 			case 1:
         // getting numberOfSyllables
 				CopyStringtoLCD(cri, 0, 0);
-				get_param();
-				memset( &param_array[i][maxparam], 0, maxparam);
-				memcpy( &param_array[i][maxparam], &keystr, maxparam);
+				get_param(i);
 				break;
 			case 2:
         // getting syllableDuration
 			  //	CopyStringtoLCD(cri, 0, 0);
-				get_param();
-				memset( &param_array[i][maxparam], 0, maxparam);
-				memcpy( &param_array[i][maxparam], &keystr, maxparam);
+				get_param(i);
 				break;
 			case 3:
         // getting syllableRepeatInterval
 			  //	CopyStringtoLCD(cri, 0, 0);
-				get_param();
-				memset( &param_array[i][maxparam], 0, maxparam);
-				memcpy( &param_array[i][maxparam], &keystr, maxparam);
+				get_param(i);
 				break;
 			case 4:
         // getting burstFrequency
 			  //	CopyStringtoLCD(cri, 0, 0);
-				get_param();
-				memset( &param_array[i][maxparam], 0, maxparam);
-				memcpy( &param_array[i][maxparam], &keystr, maxparam);
+				get_param(i);
 				break;
 		end
 	end
@@ -164,7 +157,7 @@ begin
   // reset butnumber
 	butnum = 0;
 	ready = 0;
-  
+
 	while (~ready) // inf loop??
 	begin
 		scan_keypad();
