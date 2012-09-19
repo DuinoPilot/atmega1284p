@@ -101,6 +101,7 @@ begin
   // reset key array and butnumber
 	memset(&keystr, 0, maxparam);
 	keyCounter = 0;
+
 	while (keyCounter < maxparam)
 	begin;
 		keystr[keyCounter++] = get_key();
@@ -158,8 +159,9 @@ begin
 	butnum = 0;
 	ready = 0;
 
-	while (~ready) // inf loop??
+	while (~ready)
 	begin
+
 		scan_keypad();
 
 		//if(time3 == 0)
@@ -173,9 +175,6 @@ begin
 			
 		//end
 	end
-	
-  // reset state machine
-	stateTimer = stateUpdateTime;
 
 	return output;
 end
