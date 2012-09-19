@@ -14,9 +14,10 @@
 
 #define countMS 62  //ticks/mSec
 
-#define syllable_repeat_interval 30
-#define syllable_duration 18
-#define syllable_count 4
+#define chirpRepeatInterval 250
+#define syllableRepeatInterval 30
+#define syllableDuration 18
+#define syllableCount 4
 // ramp constants
 #define RAMPUPEND 250 // = 4*62.5 or 4mSec * 62.5 samples/mSec NOTE:max=255
 #define RAMPDOWNSTART 625 // = 10*62.5
@@ -34,69 +35,92 @@ char rampTable[256] ;
 // Time variables
 // the volitile is needed because the time is only set in the ISR
 // time counts mSec, sample counts DDS samples (62.5 KHz)
-volatile unsigned int time, sample, rampCount, chirp_time, syl_time, syl_dur;
-volatile char count, scount;
+volatile unsigned int sample, rampCount;
+volatile char count;
+
+// Timers / Counters
+//volatile uint16_t chirpRepeatTimer;      // measures time between chirps
+//volatile uint8_t  syllableDurationTimer; // measures time for one syllable
+//volatile uint8_t  syllableRepeatTimer;   // measures time between syllables
+//volatile uint8_t  syllableCount;         // counts the number of syllables
+
+// Parameters
+uint16_t chirpRepeatInterval;
+uint8_t  numberOfSyllables;
+uint8_t  syllableDuration;
+uint8_t  syllableRepeatInterval;
+uint16_t burstFrequency;   // frequency of the cricket call
+
+// State Variables
+char playing;
 
 // index for sine table build
 unsigned int i;
 
 ISR (TIMER0_OVF_vect)
 begin 
-	//the actual DDR 
-	accumulator = accumulator + increment ;
-	highbyte = (char)(accumulator >> 24) ;
-	
-	// output the wavefrom sample
-	OCR0A = 128 + ((sineTable[highbyte] * rampTable[rampCount])>>7) ;
-	
-	sample++ ;
-	if (sample <= RAMPUPEND) rampCount++ ;
-	if (sample > RAMPUPEND && sample <= RAMPDOWNSTART ) rampCount = 255 ;
-	if (sample > RAMPDOWNSTART && sample <= RAMPDOWNEND ) rampCount-- ;
-	if (sample > RAMPDOWNEND) rampCount = 0; 
-	
-	// generate time base for MAIN
-	// 62 counts is about 1 mSec
-	count--;
-	if (0 == count )
-	begin
-    // all time updates should go here
-		count=countMS;
-		time++;    //in mSec
-    chirp_time++;
-    syl_time++;
-    syl_dur++;
-	end  
 
-  // if playing set ocr0a to dds, else set to 128
+  if( playing ){
+
+    if(syllableCount > 0 && syllableDurationTimer > 0){
+
+    	accumulator = accumulator + increment ;
+    	highbyte = (char)(accumulator >> 24) ;
+    	
+    	OCR0A = 128 + ((sineTable[highbyte] * rampTable[rampCount])>>7) ;
+    	
+    	sample++;
+    	if (sample <= RAMPUPEND) rampCount++ ;
+    	if (sample > RAMPUPEND && sample <= RAMPDOWNSTART ) rampCount = 255 ;
+    	if (sample > RAMPDOWNSTART && sample <= RAMPDOWNEND ) rampCount-- ;
+    	if (sample > RAMPDOWNEND) rampCount = 0; 
+
+  	}else{
+
+      syllableDurationTimer = syllableDuration;
+      OCR0A = 128;
+
+    }
+
+  	// 62 counts is about 1 mSec
+  	if( count-- == 0 )
+  	begin
+  		count = countMS;
+      chirpRepeatTimer--;
+      syllableRepeatTimer--;
+      syllableDurationTimer--;
+  	end  
+
+  }else{
+
+    OCR0A = 128;
+
+  }
+
 end 
  
-int main(void)
-begin 
-   
-  // make B.3 an output
-  DDRB = (1<<PINB3) ;
-   
-  // init the sine table
+void initDDS()
+begin
+
+  // make B.3 a pwm output
+  DDRB = (1<<PINB3);
+
+  // init the sine and ramp tables
   for (i=0; i<256; i++)
   begin
-  	sineTable[i] = (char)(127.0 * sin(6.283*((float)i)/256.0)) ;
-		// the following table needs 
-		// rampTable[0]=0 and rampTable[255]=127
-		rampTable[i] = i>>1 ;
+    sineTable[i] = (char)(127.0 * sin(6.283*((float)i)/256.0));
+    rampTable[i] = i>>1;
   end  
 
-  // init the time counter
-  time=0;
-  chirp_time = 0;
-  syl_timer  = 0;
-  syl_dur    = 0;
-  scount=0;
+  // init the timers & counter
+  count               = countMS;
+  chirpRepeatTimer    = chirpRepeatInterval;
+  syllableRepeatTimer = syllableRepeatInterval;
+  syllableCount       = numberOfSyllables;
 
-  // timer 0 runs at full rate
-  TCCR0B = 1 ;  
-  //turn on timer 0 overflow ISR
-  TIMSK0 = (1<<TOIE0) ;
+  TCCR0B = 1;          // timer 0 runs at full rate
+  TIMSK0 = (1<<TOIE0); // turn on timer 0 overflow ISR
+
   // turn on PWM
   // turn on fast PWM and OC0A output
   // at full clock rate, toggle OC0A (pin B3) 
@@ -107,37 +131,48 @@ begin
   // turn on all ISRs
   sei() ;
    
+end
+
+int main(void)
+begin 
+
+  initDDS();
+
   while(1) 
   begin  
    
-    if(chirp_time==chirp_repeat_interval)
+    if(chirpTimer == 0)
     begin
-      ctime=0;
-      if (syl_time==syllable_repeat_interval) 
+
+      // reset chirp timer and syllable count
+      chirpTimer    = chirpRepeatInterval;
+      syllableCount = numberOfSyllables;
+
+    end
+
+    if (syllableRepeatTimer == 0 && syllableCount > 0) 
       begin
-  	    // start a new syllable cycle 
-        time=0;
-  		 
-  		  // init ramp variables
-  		  sample = 0 ;
-  		  rampCount = 0;
+        // start a new syllable cycle 
+        syllableRepeatTimer = syllableRepeatInterval;
+        syllableCount--;
+
+        // init ramp variables
+        sample    = 0;
+        rampCount = 0;
 
         // init the DDS phase increment
-     		// for a 32-bit DDS accumulator, running at 16e6/256 Hz:
-     		// increment = 2^32*256*Fout/16e6 = 68719 * Fout
-    		// Fout=1000 Hz, increment= 68719000 
-     		increment = 68719000L; 
+        // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
+        // increment = 2^32*256*Fout/16e6 = 68719 * Fout
+        // Fout=1000 Hz, increment= 68719000 
+        increment = 68719 * burstFrequency; 
 
-  		  // phase lock the sine generator DDS
+        // phase lock the sine generator DDS
         accumulator = 0 ;
 
-  		  TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ; 	  
+        TCCR0A = (1<<COM0A0) | (1<<COM0A1) | (1<<WGM00) | (1<<WGM01) ;    
     
-      end //if (time==50)
-
-      // after syllable duration (ms) turn off PWM -- don't do this!
-      if (syl_dur==syllable_duration || scount==syllable_count) OCR0A = 128 ;
     end
+
   end // end while(1)
 end  //end main
       
