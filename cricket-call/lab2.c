@@ -13,7 +13,7 @@
 #include "lcd_lib.h"
 
 //timeout values for each task
-#define t3 30  // delta t
+#define stateDelay 30  // delta t
 #define t1 200
  
 //I like these 
@@ -25,7 +25,7 @@
 
 // the decoded button number
 unsigned char  butnum;
-unsigned char  ready;
+unsigned char  playing;
 
 //key pad scan table
 unsigned char keytbl[16]={0xee, 0xed, 0xeb, 0xe7,
@@ -35,8 +35,7 @@ unsigned char keytbl[16]={0xee, 0xed, 0xeb, 0xe7,
 
 unsigned char lcd_buffer[16];
 
-unsigned char count;
-unsigned char state_en;
+unsigned char keyCounter;
 unsigned char keystr[maxparam];
 unsigned char param_array[5][maxparam];
 #define term 0x77
@@ -64,7 +63,8 @@ void update_lcd(void);
 
 void initialize(void); //all the usual mcu stuff 
           
-volatile unsigned char time3, time1;	//timeout counters 
+volatile uint8_t stateTimer
+volatile uint8_t LCDTimer;	//timeout counters 
 unsigned char PushState;	//state machine  
          
 //**********************************************************
@@ -72,12 +72,12 @@ unsigned char PushState;	//state machine
 ISR (TIMER0_COMPA_vect) 
 begin
   //Decrement the three times if they are not already zero
-  if (state_en && time3>0) --time3;
-  if (time1 > 0)
+  if (~playing && stateTimer>0) --stateTimer;
+  if (LCDTimer > 0)
   begin
-  	--time1;
+  	--LCDTimer;
   end
-  else if(time1 == 0)
+  else if(LCDTimer == 0)
   begin
   	update_lcd();
   end
@@ -99,10 +99,10 @@ begin
 	
     // reset key array and butnumber
 	memset(&keystr, 0, maxparam);
-	count = 0;
-	while (count < maxparam)
+	keyCounter = 0;
+	while (keyCounter < maxparam)
 	begin;
-		keystr[count++] = get_key();
+		keystr[keyCounter++] = get_key();
 	end
 	
 
@@ -160,14 +160,12 @@ begin
 	unsigned char output;
 	unsigned char temp;
 	
-    // reset butnumber
+  // reset butnumber
 	butnum = 0;
 	
-	while (~ready)
+	while (~playing) // inf loop??
 	begin
 		scan_keypad();
-		// enable state machine timer
-		state_en = 1;
 
 		//if(time3 == 0)
 		//begin
@@ -182,64 +180,63 @@ begin
 	end
 	
   // reset state machine
-	state_en = 0;
-	time3 = t3;
-	
+	stateTimer = stateDelay;
+
 	return output;
 end
 
 /*********************/
-void scan_keypad(void)
+void scan_keypad()
 begin
-  unsigned char key;
 
+  unsigned char key;
   // get lower nibble
   DDRD  = 0x0f;
   PORTD = 0xf0;
   _delay_us(5);
   key = PIND;
-
   // get upper nibble
   DDRD  = 0xf0;
   PORTD = 0x0f;
   _delay_us(5);
   key |= PIND;
-
   // find matching keycode in keytbl
-  if ( key != 0xff )
-  begin
-    for ( butnum = 0; butnum < maxkeys; butnum++ )
-    begin
+  if ( key != 0xff ){
+
+    for ( butnum = 0; butnum < maxkeys; butnum++ ){
       if ( keytbl[butnum] == key ) break;
-    end
+    }
 
     if ( butnum == maxkeys ) butnum = 0;
     else butnum++;  // adjust by one to make range 1-16
-  end
-  else butnum = 0;
+
+  } else {
+    butnum = 0;
+  }
+
 end
 
 
 //Task 3  
-unsigned char check_state(void)
+unsigned char check_state()
 begin
 	unsigned char output = 0;
 	unsigned char test[2];
-  time3=t3;     //reset the task timer
+  stateTimer = stateDelay;     //reset the task timer
   unsigned char maybe = butnum;
 	
   switch (PushState)
   begin
     case Released: 
-      if (butnum == 0) PushState=Released;
-      else  PushState=MaybePushed;
+      if (butnum == 0) PushState = Released;
+      else PushState = MaybePushed;
       break;
     case MaybePushed:
       if (butnum == maybe) {
         PushState = MaybeTerm;
         output = butnum;
-		sprintf(lcd_buffer,"%i\0",output);
-		//LCDstring(test, strlen(test));
+		    sprintf(lcd_buffer,"%i\0",output);
+		    //LCDstring(test, strlen(test));
       }
       else PushState = Released;
       break;
@@ -264,8 +261,8 @@ begin
       else PushState = Done;
       break;
     case Done:
-	  sprintf(keystr,"\0");
-      ready = 1;
+	    sprintf(keystr,"\0");
+      playing = 1;
       break;
   end
 	
@@ -274,24 +271,15 @@ end
   
 //********************************************************** 
 //Set it all up
-void initialize(void)
+void initKeyPad(void)
 begin
-//set up the ports
-           
-  //set up timer 0 for 1 mSec timebase 
-  OCR0A = 249;  		//set the compare re to 250 time ticks
-  TIMSK0= (1<<OCIE0A);	//turn on timer 0 cmp match ISR 
-  //set prescalar to divide by 64 
-  TCCR0B= 3; //0b00000011;	
-  // turn on clear-on-match
-  TCCR0A= (1<<WGM01) ;
 
-  count = 0;
-  ready = 0;
+  keyCounter = 0;
+  playing = 0;
 
   //init the task timers
-  time3=t3;
-  time1=t1;  
+  stateTimer = stateDelay;
+  LCDTimer   = t1;  
   
   // initialize LCD
   LCDinit();
@@ -299,7 +287,6 @@ begin
   LCDclr();
   LCDGotoXY(0,0);
   //init the state machine
-	state_en  = 0;
   PushState = Released;
       
   //crank up the ISRs
@@ -311,33 +298,28 @@ end
 //Entry point and task scheduler loop
 int main(void)
 begin  
-	unsigned char start = 1;
-	unsigned char stop  = 2;
-	unsigned char value;
-	
-	unsigned char startup = 1;
-	
-  initialize();
+  unsigned char start = 1;
+  unsigned char stop  = 2;
+  unsigned char value;
+
+  unsigned char startup = 1;
+
+  initKeyPad();
   
-  //main task scheduler loop 
-	
-	//get_call();
   while(1)
   begin
 
-		get_call();
-		/*value = get_key();
-		if (value == stop)
-		begin
-			get_call();
-		end
-		else if (value == start)
-		begin
-			//play_sound();
-		end*/
+    if( playing ){
+
+      
+
+    } else {
+
+      get_call();
+
+    }
 		
   end
-
 end  
   
 
