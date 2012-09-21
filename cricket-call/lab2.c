@@ -199,12 +199,14 @@ begin
   if( --count == 0 )
   begin
     count = countMS;
-	if( playing ){
-    --chirpRepeatTimer;
-    --syllableRepeatTimer;
-    --syllableDurationTimer;
-	}
-	if (state_en && time3>0) --time3;
+
+	  if( playing ){
+      --chirpRepeatTimer;
+      --syllableRepeatTimer;
+      --syllableDurationTimer;
+  	}
+
+	  if (state_en && time3>0) --time3;
   end  
 
 end 
@@ -215,6 +217,7 @@ end
 /**********************/
 char get_param(int size)
 begin
+
   char success = 0;
   unsigned char temp;
   unsigned char index = 0;
@@ -246,11 +249,13 @@ begin
 	end
 
 	return success;
+
 end
+
 
 char get_call(void)
 begin
-    char i;
+  char i;
 	char success = 0;
 	int  temp;
 
@@ -288,10 +293,6 @@ begin
 			case 1:
 				CopyStringtoLCD(nos, 0, 0);
 
-				sprintf(lcd_buffer,"    \0");
-	    		LCDstring(lcd_buffer, strlen(lcd_buffer));
-				LCDGotoXY(8,0);
-
 				// check for valid entry
 				if (get_param(maxparam) == 0) 
 				begin
@@ -320,10 +321,6 @@ begin
 
 				CopyStringtoLCD(sd, 0, 0);
 
-				sprintf(lcd_buffer,"    \0");
-	    		LCDstring(lcd_buffer, strlen(lcd_buffer));
-				LCDGotoXY(8,0);
-				
 				if (get_param(maxparam) == 0) 
 				begin
 					temp = atoi(keystr); // convert input into integer
@@ -349,10 +346,6 @@ begin
 			case 3:
 
 				CopyStringtoLCD(sri, 0, 0);
-
-				sprintf(lcd_buffer,"    \0");
-	    		LCDstring(lcd_buffer, strlen(lcd_buffer));
-				LCDGotoXY(8,0);
 				
 				if (get_param(maxparam) == 0) 
 				begin
@@ -379,10 +372,6 @@ begin
 			case 4:
 
 				CopyStringtoLCD(bf, 0, 0);
-
-				sprintf(lcd_buffer,"    \0");
-	    		LCDstring(lcd_buffer, strlen(lcd_buffer));
-				LCDGotoXY(8,0);
 				
 				if (get_param(maxparam) == 0) 
 				begin
@@ -487,14 +476,11 @@ begin
       if ( keytbl[butnum] == key ) break;
     end
 
-    if ( butnum == maxkeys )
-		{ 
+    if ( butnum == maxkeys ){ 
 			butnum = InvalidNum;
-		}
-    else
-		{ 
+		}else{ 
 			butnum++; // adjust by one to make range 1-16
-			
+	
 			// According to keypad layout butnum 16 is labeled 0
 			if(butnum == 16) butnum = 0; // Set to 0
 		}
