@@ -1,7 +1,4 @@
 // DDS output thru PWM on timer0 OC0A (pin B.3)
-// Mega644 version
-// Produces a 15 mSec sine wave burst every 50 mSec.
-// with liner tapered ends
 
 #include <inttypes.h>
 #include <avr/io.h>
@@ -22,8 +19,8 @@
 
 // ramp constants
 #define RAMPUPEND 250 // = 4*62.5 or 4mSec * 62.5 samples/mSec NOTE:max=255
-#define RAMPDOWNSTART 625 // = 10*62.5
-#define RAMPDOWNEND 875 // = 14*62.5 NOTE: RAMPDOWNEND-RAMPDOWNSTART<255 
+//#define RAMPDOWNSTART 625 // = 10*62.5
+//#define RAMPDOWNEND 875 // = 14*62.5 NOTE: RAMPDOWNEND-RAMPDOWNSTART<255 
 
 // The DDS variables 
 volatile unsigned long accumulator ;
@@ -52,17 +49,54 @@ uint8_t  numberOfSyllables;
 uint8_t  syllableDuration;
 uint8_t  syllableRepeatInterval;
 uint16_t burstFrequency;   // frequency of the cricket call
+uint16_t rampDownStart;  // = syllableDuration * 62.5 
+uint16_t rampDownEnd;    // = (syllableDuration + 4) * 62.5
 
 // State Variables
 char playing;
-
-// index for sine table build
-unsigned int i;
 
 ISR (TIMER0_OVF_vect)
 begin 
 
   if( playing ){
+
+    if(chirpRepeatTimer == 0)
+    begin
+      // reset all timers and counters
+      cli();  // force atomic transaction by disabling interrupts
+      chirpRepeatTimer      = chirpRepeatInterval;  // takes two cycles to set 16bit int
+      syllableRepeatTimer   = syllableRepeatInterval;
+	    syllableDurationTimer = syllableDuration + 8;
+  	  syllableCount         = numberOfSyllables;
+	    sei();  // renable interrupts
+        
+    end
+
+    if (syllableRepeatTimer == 0 && syllableCount > 0) 
+    begin
+
+      // reset syllable timers
+      syllableRepeatTimer   = syllableRepeatInterval;
+      syllableDurationTimer = syllableDuration + 8;
+
+      // update syllable counter
+      syllableCount--;
+        
+      // init ramp variables
+      sample    = 0;
+      rampCount = 0;
+
+      // init the DDS phase increment
+      // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
+      // increment = 2^32*256*Fout/16e6 = 68719 * Fout
+      // Fout=1000 Hz, increment= 68719000 
+      increment = 68719 * burstFrequency; 
+
+      // phase lock the sine generator DDS
+      accumulator = 0 ; 
+	    
+    end
+
     if(syllableDurationTimer > 0){
 
     	accumulator = accumulator + increment ;
@@ -78,8 +112,6 @@ begin
 
   	}else{
 	  
-	  // reset syllable duration timer
-     // syllableDurationTimer = syllableDuration;
       OCR0A = 128;
 
     }
@@ -103,6 +135,8 @@ end
  
 void initDDS()
 begin
+
+  uint16_t i; // temporary index variable
 
   // make B.3 a pwm output
   DDRB = (1<<PINB3);
@@ -143,48 +177,9 @@ begin
   
   if( playing )
   begin 
-
+    
     while(1) 
     begin  
-   	
-      if(chirpRepeatTimer == 0)
-      begin
-
-        // reset all timers and counters
-        cli();  // force atomic transaction by disabling interrupts
-        chirpRepeatTimer      = chirpRepeatInterval;  // takes two cycles to set 16bit int
-        syllableRepeatTimer   = syllableRepeatInterval;
-	      syllableDurationTimer = syllableDuration;
-  	    syllableCount         = numberOfSyllables;
-	      sei();  // renable interrupts
-      
-      end
-
-      if (syllableRepeatTimer == 0 && syllableCount > 0) 
-      begin
-
-        // reset syllable timers
-        syllableRepeatTimer   = syllableRepeatInterval;
-	      syllableDurationTimer = syllableDuration;
-
-        // update syllable counter
-        syllableCount--;
-      
-        // init ramp variables
-        sample    = 0;
-        rampCount = 0;
-
-        // init the DDS phase increment
-        // for a 32-bit DDS accumulator, running at 16e6/256 Hz:
-        // increment = 2^32*256*Fout/16e6 = 68719 * Fout
-        // Fout=1000 Hz, increment= 68719000 
-        increment = 68719 * burstFrequency; 
-
-        // phase lock the sine generator DDS
-        accumulator = 0 ; 
-	  
-      end
-
     end // end while(1)
 
   end // if(playing)
