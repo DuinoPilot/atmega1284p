@@ -1,6 +1,7 @@
-// Debounce demo 
-// Mega644 version
-// used as an example of a state machine.      
+// Cricket Call Generator
+// Atmega1284p Version
+// Jeff Mu, jm776
+// Edgar Munoz, em447
 
 #define F_CPU 16000000             
 #include <inttypes.h>
