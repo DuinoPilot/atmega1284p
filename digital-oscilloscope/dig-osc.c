@@ -1,4 +1,4 @@
-// Black and white NTSC video generation with fixed point animation
+// Black and white NTSC Digital Oscilloscope
 // D.0 is sync
 // D.1 is video
 // Mega644 version by Shane Pryor 
@@ -1378,7 +1378,7 @@ ISR (TIMER1_COMPA_vect) {
 
 		//while( ADCSRA & (1<<ADSC));
 		adc_buffer[adc_index++] = ADCH;
-		ADCSRA = (1<<ADSC);
+		ADCSRA |= (1<<ADSC);
 		if (adc_index == 160){
 			adc_complete = 1;
 			adc_index = 0;
@@ -1434,7 +1434,7 @@ ISR (TIMER1_COMPA_vect) {
 
 		//while( ADCSRA & (1<<ADSC));
 		adc_buffer[adc_index++] = ADCH;
-		ADCSRA = (1<<ADSC);
+		ADCSRA |= (1<<ADSC);
 		if (adc_index == 160){
 			adc_complete = 1;
 			adc_index = 0;
@@ -1622,14 +1622,14 @@ char video_set(char x, char y) {
     return (screen[i] & 1<<(7-(x & 0x7)));   	
 }
 
-/*/=== fixed point mult ===============================
+//=== fixed point mult ===============================
 int multfix(int a, int b) {
   int result1 = a * b;
   int result2 = (a>>8) * (b>>8);
 
   return (result2 << 8) | (result1 >> 8);
 } 
-*/
+
 
 //=== fixed conversion macros ========================================= 
 #define int2fix(a)   (((int)(a))<<8)            //Convert char to fix. a is a char
@@ -1649,12 +1649,11 @@ int main() {
   uint8_t j;
   uint8_t temp;
   //init timer 1 to generate sync
-  //OCR1A = lineTime; 	//One NTSC line
   // TIMER 1: OC1* disconnected, CTC mode, fosc/1 (20MHz), OC1A and OC1B
   //		interrupts enabled
   TCCR1B = _BV(WGM12) | _BV(CS10);
-  OCR1A = LINE_TIME;	// time for one NTSC line
-  OCR1B = SLEEP_TIME;	// time to go to sleep
+  OCR1A  = LINE_TIME;	// time for one NTSC line
+  OCR1B  = SLEEP_TIME;	// time to go to sleep
   TIMSK1 = _BV(OCIE1B) | _BV(OCIE1A);
 
   //init ports
@@ -1663,11 +1662,11 @@ int main() {
   // USART in MSPIM mode, transmitter enabled, frequency fosc/4
   UCSR0B = _BV(TXEN0);
   UCSR0C = _BV(UMSEL01) | _BV(UMSEL00);
-  UBRR0 = 1 ;
+  UBRR0  = 1 ;
 
   // Setup ADC
-  ADMUX = (1<<ADLAR) | (1<<REFS0); // read high byte and set Vref to Vcc
-  ADCSRA = (1 << ADEN) | (1<<ADSC) + 4; //enable ADC
+  ADMUX  = (1<<ADLAR) | (1<<REFS0); // read high byte and set Vref to Vcc
+  ADCSRA = (1 << ADEN) | (1<<ADSC) + 4; //enable ADC and set prescalar to 16
 
   adc_index = 0;
   adc_complete = 0;
@@ -1675,7 +1674,7 @@ int main() {
   //initialize synch constants 
   LineCount = 1;
 
-  syncON = 0b00000000;
+  syncON  = 0b00000000;
   syncOFF = 0b00000001;
   
   //Print "CORNELL" message
@@ -1690,7 +1689,6 @@ int main() {
 
   //video_line(0,0,0,height,1);
   video_line(width,0,width,height,1);
-
   video_line(0,10,width,10,1);
   video_line(0,0,width,0,1);
   video_line(0,height,width,height,1);
