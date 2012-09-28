@@ -8,6 +8,7 @@
 //    plays a musical scale from port B.3
 //    UART SPI-mode video output from Morgan D. Jones
 
+#define F_CPU 16000000
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
