@@ -1349,18 +1349,16 @@ ISR (TIMER1_COMPA_vect) {
 	//update the current scanline number
 	LineCount++;   
   
-	//begin inverted (Vertical) synch after line 247
+	//begin inverted (Vertical) synch after line 247 (180 us)
 	if (LineCount==248) { 
-    	//syncON = 0b00000001;
-    	syncON = 0b01000000;
+    	syncON = 0b00000001;
     	syncOFF = 0;
   	}
   
 	//back to regular sync after line 250
 	if (LineCount==251)	{
 		syncON = 0;
-		//syncOFF = 0b00000001;
-		syncOFF = 0b01000000;
+		syncOFF = 0b00000001;
 	}  
   
   	//start new frame after line 262
@@ -1374,9 +1372,34 @@ ISR (TIMER1_COMPA_vect) {
 	PORTD = syncOFF;   
 
 	if (LineCount < ScreenBot && LineCount >= ScreenTop) {
-		//compute offset into screen array
-		//screenindex = screen + ((LineCount - ScreenTop) << 4) + ((LineCount - ScreenTop) << 3);
 
+		//compute offset into screen array
+		screenStart0 = (LineCount - ScreenTop) * bytes_per_line;
+		//center image on screen
+
+		// addiw and sts = 4 clock cycles each
+		// total ~ 76 cycles = 4.75 us
+		screenStart1  = screenStart0  + 1;
+		screenStart2  = screenStart1  + 1;
+		screenStart3  = screenStart2  + 1;
+		screenStart4  = screenStart3  + 1;
+		screenStart5  = screenStart4  + 1;
+		screenStart6  = screenStart5  + 1;
+		screenStart7  = screenStart6  + 1;
+		screenStart8  = screenStart7  + 1;
+		screenStart9  = screenStart8  + 1;
+		screenStart10 = screenStart9  + 1;
+		screenStart11 = screenStart10 + 1;
+		screenStart12 = screenStart11 + 1;
+		screenStart13 = screenStart12 + 1;
+		screenStart14 = screenStart13 + 1;
+		screenStart15 = screenStart14 + 1;
+		screenStart16 = screenStart15 + 1;
+		screenStart17 = screenStart16 + 1;
+		screenStart18 = screenStart17 + 1;
+		screenStart19 = screenStart18 + 1;
+
+		// 2us for adc sampling
 		//while( ADCSRA & (1<<ADSC));
 		adc_buffer[adc_index++] = ADCH;
 		ADCSRA |= (1<<ADSC);
@@ -1385,53 +1408,43 @@ ISR (TIMER1_COMPA_vect) {
 			adc_index = 0;
 		}
 
-		///}
-		//compute offset into screen array
-		//screenStart = ((LineCount - ScreenTop) << 4) + ((LineCount - ScreenTop) << 3) ;
-		screenStart = (LineCount - ScreenTop) * bytes_per_line;
-		//center image on screen
-		_delay_us(7);
 		//blast the data to the screen
 		// We can load UDR twice because it is double-bufffered
-		UDR0 = screen[screenStart] ;
-		UCSR0B = _BV(TXEN0);
-		UDR0 = screen[screenStart+1] ;
+		// UDR0 outputs to D.1
+		UDR0 = screen[screenStart0] ;
+		UCSR0B = _BV(TXEN0); // UART control bit - transmit enable
+		UDR0 = screen[screenStart1] ;
+
+		while (!(UCSR0A & _BV(UDRE0))) ; //UART Data Register Empty Ch0
+		UDR0 = screen[screenStart2] ;   // takes 2 us to empty data register
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+2] ;
+		UDR0 = screen[screenStart3] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+3] ;
+		UDR0 = screen[screenStart4] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+4] ;
+		UDR0 = screen[screenStart5] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+5] ;
+		UDR0 = screen[screenStart6] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+6] ;
+		UDR0 = screen[screenStart7] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+7] ;
+		UDR0 = screen[screenStart8] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+8] ;
+		UDR0 = screen[screenStart9] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+9] ;
+		UDR0 = screen[screenStart10] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+10] ;
+		UDR0 = screen[screenStart11] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+11] ;
+		UDR0 = screen[screenStart12] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+12] ;
+		UDR0 = screen[screenStart13] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+13] ;
+		UDR0 = screen[screenStart14] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+14] ;
+		UDR0 = screen[screenStart15] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+15] ;
-		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+16] ;
-		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+17] ;
-		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+18] ;
-		while (!(UCSR0A & _BV(UDRE0))) ;
-		UDR0 = screen[screenStart+19] ;
+		UDR0 = screen[screenStart16] ;
 
 		//while( ADCSRA & (1<<ADSC));
 		adc_buffer[adc_index++] = ADCH;
@@ -1440,10 +1453,34 @@ ISR (TIMER1_COMPA_vect) {
 			adc_complete = 1;
 			adc_index = 0;
 		}
+
+		while (!(UCSR0A & _BV(UDRE0))) ;
+		UDR0 = screen[screenStart17] ;
+		while (!(UCSR0A & _BV(UDRE0))) ;
+		UDR0 = screen[screenStart18] ;
+		while (!(UCSR0A & _BV(UDRE0))) ;
+		UDR0 = screen[screenStart19] ;
 
 		UCSR0B = 0 ;
 
-	}         
+	}else{
+		_delay_us(7);
+		//sample adc then check for trigger condition
+		//while( ADCSRA & (1<<ADSC));
+		adc_buffer[adc_index++] = ADCH;
+		ADCSRA |= (1<<ADSC);
+		if (adc_index == 160){
+			adc_complete = 1;
+			adc_index = 0;
+		}
+		_delay_us(32);
+		adc_buffer[adc_index++] = ADCH;
+		ADCSRA |= (1<<ADSC);
+		if (adc_index == 160){
+			adc_complete = 1;
+			adc_index = 0;
+		}
+	}     
 }
 
 //==================================
