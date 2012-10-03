@@ -44,6 +44,8 @@ volatile uint8_t  adc_index;
 uint8_t adc_buffer[160];
 uint8_t adc_erase[160];
 uint8_t adc_complete;
+uint8_t draw_complete;
+
 
 //current line number in the current frame
 volatile int LineCount;
@@ -1342,14 +1344,14 @@ ISR(TIMER1_COMPB_vect, ISR_NAKED)
 //sleep mode to get accurate timing of the sync pulses
 
 ISR (TIMER1_COMPA_vect) {
-	int x, screenStart ;
+	int x, screenStart0,screenStart1,screenStart2,screenStart3,screenStart4,screenStart5,screenStart6,screenStart7,screenStart8,screenStart9,screenStart10,screenStart11,screenStart12,screenStart13,screenStart14,screenStart15,screenStart16,screenStart17,screenStart18, screenStart19 ;
 	//start the Horizontal sync pulse    
 	PORTD = syncON;
 
 	//update the current scanline number
 	LineCount++;   
   
-	//begin inverted (Vertical) synch after line 247 (180 us)
+	//begin inverted (Vertical) synch after line 247
 	if (LineCount==248) { 
     	syncON = 0b00000001;
     	syncOFF = 0;
@@ -1374,11 +1376,8 @@ ISR (TIMER1_COMPA_vect) {
 	if (LineCount < ScreenBot && LineCount >= ScreenTop) {
 
 		//compute offset into screen array
-		screenStart0 = (LineCount - ScreenTop) * bytes_per_line;
-		//center image on screen
-
-		// addiw and sts = 4 clock cycles each
-		// total ~ 76 cycles = 4.75 us
+		//screenStart = ((LineCount - ScreenTop) << 4) + ((LineCount - ScreenTop) << 3) ;
+		screenStart0  = (LineCount - ScreenTop) * bytes_per_line;
 		screenStart1  = screenStart0  + 1;
 		screenStart2  = screenStart1  + 1;
 		screenStart3  = screenStart2  + 1;
@@ -1399,24 +1398,24 @@ ISR (TIMER1_COMPA_vect) {
 		screenStart18 = screenStart17 + 1;
 		screenStart19 = screenStart18 + 1;
 
-		// 2us for adc sampling
-		//while( ADCSRA & (1<<ADSC));
-		adc_buffer[adc_index++] = ADCH;
-		ADCSRA |= (1<<ADSC);
-		if (adc_index == 160){
-			adc_complete = 1;
-			adc_index = 0;
-		}
+
 
 		//blast the data to the screen
 		// We can load UDR twice because it is double-bufffered
-		// UDR0 outputs to D.1
 		UDR0 = screen[screenStart0] ;
-		UCSR0B = _BV(TXEN0); // UART control bit - transmit enable
+		UCSR0B = _BV(TXEN0);
 		UDR0 = screen[screenStart1] ;
-
-		while (!(UCSR0A & _BV(UDRE0))) ; //UART Data Register Empty Ch0
-		UDR0 = screen[screenStart2] ;   // takes 2 us to empty data register
+		if(draw_complete){
+			//while( ADCSRA & (1<<ADSC));
+			adc_buffer[adc_index++] = ADCH;
+			ADCSRA |= (1<<ADSC);
+			if (adc_index == 160){
+				adc_complete = 1;
+				adc_index = 0;
+			}
+		}
+		while (!(UCSR0A & _BV(UDRE0))) ;
+		UDR0 = screen[screenStart2] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
 		UDR0 = screen[screenStart3] ;
 		while (!(UCSR0A & _BV(UDRE0))) ;
@@ -1446,12 +1445,14 @@ ISR (TIMER1_COMPA_vect) {
 		while (!(UCSR0A & _BV(UDRE0))) ;
 		UDR0 = screen[screenStart16] ;
 
-		//while( ADCSRA & (1<<ADSC));
-		adc_buffer[adc_index++] = ADCH;
-		ADCSRA |= (1<<ADSC);
-		if (adc_index == 160){
-			adc_complete = 1;
-			adc_index = 0;
+		if(draw_complete){
+			//while( ADCSRA & (1<<ADSC));
+			adc_buffer[adc_index++] = ADCH;
+			ADCSRA |= (1<<ADSC);
+			if (adc_index == 160 && draw_complete){
+				adc_complete = 1;
+				adc_index = 0;
+			}
 		}
 
 		while (!(UCSR0A & _BV(UDRE0))) ;
@@ -1461,26 +1462,30 @@ ISR (TIMER1_COMPA_vect) {
 		while (!(UCSR0A & _BV(UDRE0))) ;
 		UDR0 = screen[screenStart19] ;
 
+
+
 		UCSR0B = 0 ;
 
 	}else{
-		_delay_us(7);
-		//sample adc then check for trigger condition
-		//while( ADCSRA & (1<<ADSC));
-		adc_buffer[adc_index++] = ADCH;
-		ADCSRA |= (1<<ADSC);
-		if (adc_index == 160){
-			adc_complete = 1;
-			adc_index = 0;
+		_delay_us(10);
+		if(draw_complete){
+			adc_buffer[adc_index++] = ADCH;
+			ADCSRA |= (1<<ADSC);
+			if (adc_index == 160 && draw_complete){
+				adc_complete = 1;
+				adc_index = 0;
+			}
 		}
-		_delay_us(32);
-		adc_buffer[adc_index++] = ADCH;
-		ADCSRA |= (1<<ADSC);
-		if (adc_index == 160){
-			adc_complete = 1;
-			adc_index = 0;
+		_delay_us(28);
+		if(draw_complete){
+			adc_buffer[adc_index++] = ADCH;
+			ADCSRA |= (1<<ADSC);
+			if (adc_index == 160 && draw_complete){
+				adc_complete = 1;
+				adc_index = 0;
+			}
 		}
-	}     
+	}
 }
 
 //==================================
@@ -1678,14 +1683,64 @@ int multfix(int a, int b) {
 //=== animation stuff ==================================================
 char cu1[]="Cornell  ECE 4760";
 char cu2[]="F: ";
+uint8_t PushFlag;
+uint8_t PushState;
+uint8_t running;
+volatile uint8_t inputTimer, buttonTimer
+//State machine state names
+#define NoPush 1 
+#define MaybePush 2
+#define Pushed 3
+#define MaybeNoPush 4
 
 ///////////////
+void init(void);
+void check_button_state(void);
 
-//==================================         
-// set up the ports and timers
-int main() {
-  uint8_t j;
-  uint8_t temp;
+void handle_input(void);
+
+void handle_input(){
+
+	inputTimer = 50;
+	if(PushFlag){
+		PushFlag = 0;
+		running ^= running;
+	}
+}
+
+void check_button_state{
+  buttonTimer = 50;     //reset the task timer
+  switch (PushState){
+     case NoPush: 
+        if (~PINB & 0x07) PushState=MaybePush;
+        else PushState=NoPush;
+        break;
+     case MaybePush:
+        if (~PINB & 0x07) 
+        begin
+           PushState=Pushed;   
+           PushFlag=1;
+        end
+        else PushState=NoPush;
+        break;
+     case Pushed:  
+        if (~PINB & 0x07) PushState=Pushed; 
+        else PushState=MaybeNoPush;    
+        break;
+     case MaybeNoPush:
+        if (~PINB & 0x07) PushState=Pushed; 
+        else 
+        begin
+           PushState=NoPush;
+           PushFlag=0;
+        end    
+        break;
+    }
+
+}
+
+void init(){
+
   //init timer 1 to generate sync
   // TIMER 1: OC1* disconnected, CTC mode, fosc/1 (20MHz), OC1A and OC1B
   //		interrupts enabled
@@ -1696,6 +1751,8 @@ int main() {
 
   //init ports
   DDRD = 0x03;		//video out
+  DDRB = 0;	// B0,B1,B2 are inputs
+  //PORTB = 0x07;  // turn on pullups on B0, B1 and B3 for pushbuttons
 
   // USART in MSPIM mode, transmitter enabled, frequency fosc/4
   UCSR0B = _BV(TXEN0);
@@ -1708,13 +1765,15 @@ int main() {
 
   adc_index = 0;
   adc_complete = 0;
+  draw_complete = 1;
+  running = 1;
   
   //initialize synch constants 
   LineCount = 1;
 
   syncON  = 0b00000000;
   syncOFF = 0b00000001;
-  
+
   //Print "CORNELL" message
   video_puts(30,2,cu1);
 
@@ -1725,7 +1784,7 @@ int main() {
   #define width screen_width-1
   #define height screen_height-1
 
-  //video_line(0,0,0,height,1);
+  video_line(0,0,0,height,1);
   video_line(width,0,width,height,1);
   video_line(0,10,width,10,1);
   video_line(0,0,width,0,1);
@@ -1733,12 +1792,27 @@ int main() {
  
 
   ///////////////////////
+
+  //for no button push
+  PushFlag = 0;
+  //init the state machine
+  PushState = NoPush;
+
   
   // Set up single video line timing
   sei();
   set_sleep_mode(SLEEP_MODE_IDLE);
   sleep_enable();
 
+}
+
+//==================================         
+// set up the ports and timers
+int main() {
+  uint8_t j;
+  uint8_t temp;
+
+  init();
 
   // The following loop executes the if-block
   // when the screen refresh is done
@@ -1747,20 +1821,24 @@ int main() {
 
 	if (LineCount == ScreenBot) { 
 
-		if (adc_complete)
+		if (adc_complete && running)
 		{
-			/*for (j = 0; j<160; j++){
-				temp = adc_erase[j] >> 2;
-				video_pt(j, -screen_height + temp, 2);
-			}*/
+			draw_complete = 0;
+			for (j = 0; j<160; j++){
+				temp = adc_erase[j] >> 1;
+				video_pt(j, -(screen_height+40) + temp, 2);
+				// add the 40 offset to make the hoirz line less noticeable
+			}
 			
 			for (j = 0; j<160; j++){
-				temp = adc_buffer[j] >> 2;
-				video_pt(j, -screen_height + temp, 2);
+				temp = adc_buffer[j] >> 1;
+				video_pt(j, -(screen_height+40) + temp, 2);
+				// add the 40 offset to make the hoirz line less noticeable
 			}
 			
 			memcpy(adc_erase, adc_buffer, 160);
 			adc_complete = 0;
+			draw_complete = 1;
 		}	
 		
 		/////////////////////////////////////////
